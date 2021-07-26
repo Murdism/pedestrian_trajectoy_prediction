@@ -1,13 +1,11 @@
-from keras.engine import sequential
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from keras.optimizers import Adam
 from matplotlib import pyplot as plt
-# from tensorflow import Session
 import tensorflow as tf
-# tf.disable_v2_behavior()
-# from tensorflow import ConfigProto
+from tensorflow.keras.layers import Lambda
+from tensorflow.keras import backend as K
 from keras.models import Sequential
 from keras.layers import LSTM
 from keras.layers import Dense, Reshape
@@ -314,6 +312,7 @@ def train_model(train_input,train_target,validatation_input,validation_target,te
                         n_timesteps_in=len(train_input[0])
                         input_shape=train_input[0].shape
                         n_units= 16
+                        batch_size=5
 
 
                         #model,encoder,decoder=define_models()
@@ -323,10 +322,6 @@ def train_model(train_input,train_target,validatation_input,validation_target,te
                         encoder_outputs, state_h, state_c = encoder_lstm(encoder_inputs)
                         states = [state_h, state_c]
                         all_outputs = []
-                        #layer_2=Dense(n_timesteps_in*n_features,activation='relu')(encoder_outputs)
-                        #output_trial=Reshape((n_timesteps_in,n_features))(layer_2)
-                        print("Encoder_output",encoder_outputs.shape)
-
 
                         # Decoder layers
                         numberOfLSTMunits=16
@@ -334,26 +329,45 @@ def train_model(train_input,train_target,validatation_input,validation_target,te
                         decoder_lstm = LSTM(numberOfLSTMunits, return_sequences=True, 
                                         return_state=True, name='decoder_lstm')
                         decoder_dense = Dense(n_features, activation='softmax')
-
                         
-                #                 # Define and compile model first
-                #         model_encoder = Model(encoder_inputs, output_trial) 
-                #         opt = Adam(learning_rate=0.005)
-                #         model_encoder.compile(loss='mse', optimizer=opt)
-                #         history=model_encoder.fit(train_input,train_target,epochs=30, batch_size=5, verbose=1,validation_data=(validatation_input, validation_target))
-                #         model_encoder.save("Pre_trained_models/model_Encoder_Decoder")
-                #         plt.plot(history.history['loss'],c='blue')
-                #         plt.plot(history.history['val_loss'],c='red')
-                #         plt.show()
-                #         plt.show()
+                        # Prepare decoder initial input data: just contains the START character 0
+                        # Note that we made it a constant one-hot-encoded in the model
+                        # that is, [1 0 0 0 0 0 0 0 0 0] is the initial input for each loop
+                        decoder_input_data = np.zeros((batch_size, 1, n_features))
+                        #decoder_input_data = np.zeros(( 1, n_features))
+                        #decoder_input_data[0, 0] = 1 
+                        print("Decoder: ",decoder_input_data)
+                        
+                        # that is, [1 0 0 0 0 0 0 0 0 0] is the initial input for each loop
+                        inputs = decoder_input_data
 
-                # # encoder_outputs, state_h, state_c = encoder_lstm(encoder_inputs)
-               
-                # # states = [state_h, state_c]
-        
+                        for _ in range(n_timesteps_in): 
+                                # Run the decoder on one time step
+                                outputs, state_h, state_c = decoder_lstm(inputs,
+                                                                        initial_state=states)
+                               
+                                print("SIZE OF OUTPUT:     ",outputs.shape)
+                                outputs = decoder_dense(outputs)
+                                # Store the current prediction (we will concatenate all predictions later)
+                                all_outputs.append(outputs)
+                                # Reinject the outputs as inputs for the next loop iteration
+                                # as well as update the states
+                                inputs = outputs
+                                states = [state_h, state_c]
+                                print("INPUT AGAIN: ",outputs.shape)
 
-                # prediction_test = model_encoder.predict(test_input)
-                # prediction_train=model_encoder.predict(train_input)
+                          # Concatenate all predictions such as [batch_size, timesteps, features]
+                        decoder_outputs = Lambda(lambda x: K.concatenate(x, axis=1))(all_outputs)
+
+                        # Define and compile model 
+                        model = Model(encoder_inputs, decoder_outputs, name='model_encoder_decoder')
+                        opt = Adam(learning_rate=0.005)
+                        model.compile(optimizer=opt, loss='mse')
+
+                        #layer_2=Dense(n_timesteps_in*n_features,activation='relu')(encoder_outputs)
+                        #output_trial=Reshape((n_timesteps_in,n_features))(layer_2)
+                        print("Encoder_output",encoder_outputs.shape)
+
 
         elif(model_kind=='LSTM_2'):
                 print("Model LSTM_2 ")
