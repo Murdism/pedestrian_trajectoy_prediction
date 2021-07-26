@@ -4,9 +4,13 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from keras.optimizers import Adam
 from matplotlib import pyplot as plt
+# from tensorflow import Session
+import tensorflow as tf
+# tf.disable_v2_behavior()
+# from tensorflow import ConfigProto
 from keras.models import Sequential
 from keras.layers import LSTM
-from keras.layers import Dense
+from keras.layers import Dense, Reshape
 from keras.models import load_model,Model
 from keras.layers import TimeDistributed
 from keras.layers import RepeatVector
@@ -14,13 +18,65 @@ from keras .layers import Input
 import numpy as np
 import pickle
 import random
-from Displacement_error import ADE,FDE,prediction_displacement,ADE_double_coordinates,FDE_double_coordinates
+from Displacement_error import ADE,FDE,prediction_displacement,ADE_double_coordinates,FDE_double_coordinates,prediction_displacement_double
 
-	
+
+# def create_hard_coded_decoder_input_model(batch_size,n_units=16):
+                
+#                 #initialize
+#                 numberOfLSTMunits=n_units
+#                 n_timesteps_in=8
+#                 n_features=2
+
+#                 # The first part is encoder
+#                 encoder_inputs = Input(shape=(n_timesteps_in, n_features), name='encoder_inputs')
+#                 encoder_lstm = LSTM(numberOfLSTMunits, return_state=True,  name='encoder_lstm')
+#                 encoder_outputs, state_h, state_c = encoder_lstm(encoder_inputs)
+                
+#                 # initial context vector is the states of the encoder
+#                 states = [state_h, state_c]
+                
+#                 # Set up the decoder layers
+#                 # Attention: decoder receives 1 token at a time &
+#                 # decoder outputs 1 token at a time 
+#                 decoder_inputs = Input(shape=(1, n_features))
+#                 decoder_lstm = LSTM(numberOfLSTMunits, return_sequences=True, 
+#                                 return_state=True, name='decoder_lstm')
+#                 decoder_dense = Dense(n_features, activation='softmax',  name='decoder_dense')
+
+#                 all_outputs = []
+#                 # Prepare decoder initial input data: just contains the START character 0
+#                 # Note that we made it a constant one-hot-encoded in the model
+#                 # that is, [1 0 0 0 0 0 0 0 0 0] is the initial input for each loop
+#                 decoder_input_data = np.zeros((batch_size, 1, n_features))
+#                 decoder_input_data[:, 0, 0] = 1 
+                
+#                 # that is, [1 0 0 0 0 0 0 0 0 0] is the initial input for each loop
+#                 inputs = decoder_input_data
+#                 # decoder will only process one time step at a time
+#                 # loops for fixed number of time steps: n_timesteps_in
+#                 for _ in range(n_timesteps_in):
+#                                 # Run the decoder on one time step
+#                                 outputs, state_h, state_c = decoder_lstm(inputs,initial_state=states)
+#                                 outputs = decoder_dense(outputs)
+#                                 # Store the current prediction (we will concatenate all predictions later)
+#                                 all_outputs.append(outputs)
+#                                 # Reinject the outputs as inputs for the next loop iteration
+#                                 # as well as update the states
+#                                 inputs = outputs
+#                                 states = [state_h, state_c]
+
+#                 # Concatenate all predictions such as [batch_size, timesteps, features]
+#                # decoder_outputs = Lambda(lambda x: K.concatenate(x, axis=1))(all_outputs)
+
+#                 # Define and compile model 
+#                 model = Model(encoder_inputs, decoder_outputs, name='model_encoder_decoder')
+#                 model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+#                 return model	
 # returns train, inference_encoder and inference_decoder models
-def define_models(n_input=1, n_output=1, n_units=32):
+def define_models(n_input=1, n_output=1, n_units=32,n_timesteps_in=8,n_features=2):
 	# define training encoder
-	encoder_inputs = Input(shape=(None, n_input))
+	encoder_inputs =Input(shape=(n_timesteps_in, n_features), name='encoder_inputs')#Input(shape=(None, n_input))
 	encoder = LSTM(n_units, return_state=True)
 	encoder_outputs, state_h, state_c = encoder(encoder_inputs)
 	encoder_states = [state_h, state_c]
@@ -50,24 +106,25 @@ def reshaped(data,prediction_size,num_of_features):
    output=data.reshape(len(data),prediction_size,num_of_features)
    return output
 
-def plotter_double(past,pred,d_truth,num_plots,show_together=False):
+def plotter_double(past,pred,d_truth,num_plots=6,show_together=False):
         
         past=np.array(past)
         pred=np.array(pred)
         d_truth=np.array(d_truth)
         
-        for i in range(6):
+        for i in range(num_plots):
+                n = random.randint(0,(len(pred)-1))
                 past_x,past_y,pred_x,pred_y,truth_x,truth_y=[],[],[],[],[],[]
-                for j in range (len(past[i])):
-                   past_x.append(past[i][j][0])  
-                   past_y.append(past[i][j][1])    
+                for j in range (len(past[n])):
+                   past_x.append(past[n][j][0])  
+                   past_y.append(past[n][j][1])    
 
-                for j in range (len(pred[i])):
-                   pred_x.append(pred[i][j][0])  
-                   pred_y.append(pred[i][j][1]) 
+                for j in range (len(pred[n])):
+                   pred_x.append(pred[n][j][0])  
+                   pred_y.append(pred[n][j][1]) 
 
-                   truth_x.append(d_truth[i][j][0])  
-                   truth_y.append(d_truth[i][j][1])
+                   truth_x.append(d_truth[n][j][0])  
+                   truth_y.append(d_truth[n][j][1])
                 
                 plt.scatter(past_x,past_y,c='gray')
                 plt.scatter(truth_x,truth_y,c='Red')
@@ -88,7 +145,7 @@ def plotter(past,pred,d_truth,num_plots,show_together):
         
         num_of_points=int(len(pred[0])/2)
         num_of_points_input=int(len(past.columns)/2)
-        for i in range(len(pred)):
+        for i in range(num_plots):
                 n = random.randint(0,(len(pred)-1))
 
                 past_x,past_y,pred_x,pred_y,truth_x,truth_y=[],[],[],[],[],[]
@@ -109,9 +166,9 @@ def plotter(past,pred,d_truth,num_plots,show_together):
                    
 
                 plt.scatter(past_x,past_y,c='gray')
-                # plt.scatter(truth_x,truth_y,c='Red')
+                plt.scatter(truth_x,truth_y,c='Red')
                 # #plt.plot(truth_x,truth_y,c='Red')
-                # plt.scatter(pred_x,pred_y,c='Green')
+                plt.scatter(pred_x,pred_y,c='Green')
                 #plt.plot(pred_x,pred_y,c='Green')
                 #plt.scatter(pred_x[0],pred_y[0],c='blue') 
                 
@@ -121,6 +178,36 @@ def plotter(past,pred,d_truth,num_plots,show_together):
                  plt.show()
         if(show_together==True):
                  plt.show()
+
+def show_error_double(prediction_train,prediction_test,train_target,test_target):
+                # # Show error rate
+        print("AVERAGE DISTANCE BETWEEN FIRST AND LAST POINT Train: ",prediction_displacement_double(train_target))
+        print("AVERAGE DISTANCE BETWEEN FIRST AND LAST POINT Test: ",prediction_displacement_double(test_target))
+             
+        #average_displacement_error
+        print("ADE ERROR RATE TEST: ", ADE_double_coordinates(prediction_test,test_target))
+        #average_displacement_error
+        print("ADE ERROR RATE TRAIN: ", ADE_double_coordinates(prediction_train,train_target))
+        print("//////////////////////////////////////////")
+        #Final_displacement_error
+        print("FDE ERROR RATE TEST: ", FDE_double_coordinates(prediction_test,test_target))
+        print("FDE ERROR RATE TRAIN: ", FDE_double_coordinates(prediction_train,train_target))
+
+def show_error_single(prediction_train,prediction_test,train_target,test_target):
+                # # Show error rate
+        print("AVERAGE DISTANCE BETWEEN FIRST AND LAST POINT Train: ",prediction_displacement(train_target))
+        print("AVERAGE DISTANCE BETWEEN FIRST AND LAST POINT Test: ",prediction_displacement(test_target))
+        print("////////////////////////////////////////////////")
+        #average_displacement_error
+        print("ADE ERROR RATE TEST: ", ADE(prediction_test,test_target))
+        #average_displacement_error
+        print("ADE ERROR RATE TRAIN: ", ADE(prediction_train,train_target))
+        print("//////////////////////////////////////////")
+        #Final_displacement_error
+        print("FDE ERROR RATE TEST: ", FDE(prediction_test,test_target))
+        print("FDE ERROR RATE TRAIN: ", FDE(prediction_train,train_target))
+
+
 def train_model(train_input,train_target,validatation_input,validation_target,test_input,test_target,model_kind='linear',order_of_polynomial=3,load=False): 
         
 
@@ -195,71 +282,137 @@ def train_model(train_input,train_target,validatation_input,validation_target,te
                 #         model.fit(train_input, train_target, epochs=60, batch_size=20, verbose=1,validation_data=(validatation_input, validation_target))
                 #         model.save('Pre_trained_models/model_LSTM')
 
-                else:
-                        model = Sequential()
-                        model.add(LSTM(16, input_shape=(train_input.shape[1],train_input.shape[2]),return_sequences=True))
-                        #model.add(RepeatVector(train_target.shape[1]))
-                        model.add(LSTM(16, return_sequences=True))
-                        #model.add(TimeDistributed(Dense(1,2)))
-                        model.add(TimeDistributed(Dense(2)))
-                        opt = Adam(learning_rate=0.005)
-                        model.compile(loss='mse', optimizer=opt)
-                        history=model.fit(train_input, train_target, epochs=30, batch_size=10, verbose=1,validation_data=(validatation_input, validation_target))
-                        model.save('Pre_trained_models/model_LSTM_Encoder')
+                # else:
+                #         model = Sequential()
+                #         model.add(LSTM(16, input_shape=(train_input.shape[1],train_input.shape[2]),return_sequences=True))
+                #         #model.add(RepeatVector(train_target.shape[1]))
+                #         model.add(LSTM(16, return_sequences=True))
+                #         #model.add(TimeDistributed(Dense(1,2)))
+                #         model.add(TimeDistributed(Dense(2)))
+                #         opt = Adam(learning_rate=0.005)
+                #         model.compile(loss='mse', optimizer=opt)
+                #         history=model.fit(train_input, train_target, epochs=30, batch_size=10, verbose=1,validation_data=(validatation_input, validation_target))
+                #         model.save('Pre_trained_models/model_LSTM_Encoder')
                 
-                prediction_test = model.predict(test_input)
-                prediction_train=model.predict(train_input)
-                plt.plot(history.history['loss'],c='blue')
-                plt.plot(history.history['val_loss'],c='red')
-                plt.show()
+                # prediction_test = model.predict(test_input)
+                # prediction_train=model.predict(train_input)
+                # plt.plot(history.history['loss'],c='blue')
+                # plt.plot(history.history['val_loss'],c='red')
+                # plt.show()
 
+        elif(model_kind=='Encoder_Decoder'):
+                print("Model Encoder_Decoder ")
+
+                if (load==True):
+                       try:
+                               model_encoder = load_model("Pre_trained_models/model_Encoder_Decoder")
+                       except:
+                               print("No Model Has Been Saved Before!")
+                else:
+                        # params 
+                        n_features=len(train_input[0][0])
+                        n_timesteps_in=len(train_input[0])
+                        input_shape=train_input[0].shape
+                        n_units= 16
+
+
+                        #model,encoder,decoder=define_models()
+                                # define training encoder
+                        encoder_inputs = Input(shape=(n_timesteps_in, n_features), name='encoder_inputs')
+                        encoder_lstm = LSTM(n_units, return_state=True,  name='encoder_lstm')
+                        encoder_outputs, state_h, state_c = encoder_lstm(encoder_inputs)
+                        states = [state_h, state_c]
+                        all_outputs = []
+                        #layer_2=Dense(n_timesteps_in*n_features,activation='relu')(encoder_outputs)
+                        #output_trial=Reshape((n_timesteps_in,n_features))(layer_2)
+                        print("Encoder_output",encoder_outputs.shape)
+
+
+                        # Decoder layers
+                        numberOfLSTMunits=16
+                        decoder_inputs = Input(shape=(1, n_features), name='decoder_inputs')
+                        decoder_lstm = LSTM(numberOfLSTMunits, return_sequences=True, 
+                                        return_state=True, name='decoder_lstm')
+                        decoder_dense = Dense(n_features, activation='softmax')
+
+                        
+                #                 # Define and compile model first
+                #         model_encoder = Model(encoder_inputs, output_trial) 
+                #         opt = Adam(learning_rate=0.005)
+                #         model_encoder.compile(loss='mse', optimizer=opt)
+                #         history=model_encoder.fit(train_input,train_target,epochs=30, batch_size=5, verbose=1,validation_data=(validatation_input, validation_target))
+                #         model_encoder.save("Pre_trained_models/model_Encoder_Decoder")
+                #         plt.plot(history.history['loss'],c='blue')
+                #         plt.plot(history.history['val_loss'],c='red')
+                #         plt.show()
+                #         plt.show()
+
+                # # encoder_outputs, state_h, state_c = encoder_lstm(encoder_inputs)
+               
+                # # states = [state_h, state_c]
+        
+
+                # prediction_test = model_encoder.predict(test_input)
+                # prediction_train=model_encoder.predict(train_input)
 
         elif(model_kind=='LSTM_2'):
                 print("Model LSTM_2 ")
-                model,encoder,decoder=define_models()
-                opt = Adam(learning_rate=0.005)
-                model.compile(loss='mse', optimizer=opt)
-                history=model.fit(train_input,train_target)
 
-                prediction_test = model.predict(test_input)
-                prediction_train=model.predict(train_input)
-                plt.plot(history.history['loss'],c='blue')
-                plt.plot(history.history['val_loss'],c='red')
-                plt.show()
-                plt.show()
-        # Print predictions and ground truth
-        '''for i in range (len(prediction)):
-                        print(prediction[i])
-                        print(test_target.iloc[i]) '''
+                if (load==True):
+                       try:
+                               model_encoder = load_model("Pre_trained_models/model_LSTM_Encoder_only2")
+                       except:
+                               print("No Model Has Been Saved Before!")
+                else:
+                        # params 
+                        n_features=len(train_input[0][0])
+                        n_timesteps_in=len(train_input[0])
+                        input_shape=train_input[0].shape
+                        n_units= 16
+
+
+                        #model,encoder,decoder=define_models()
+                                # define training encoder
+                        encoder_inputs = Input(shape=(n_timesteps_in, n_features), name='encoder_inputs')
+                        encoder_lstm = LSTM(n_units, return_state=True,  name='encoder_lstm')
+                        layer_1 =  LSTM(n_units, return_state=True,  name='encoder_lstm')(encoder_inputs)
+                        encoder_outputs, state_h, state_c = encoder_lstm(encoder_inputs)
+                        print("Encoder_output",encoder_outputs.shape)
+                        layer_2=Dense(n_timesteps_in*n_features,activation='relu')(encoder_outputs)
+                        output_trial=Reshape((n_timesteps_in,n_features))(layer_2)
+
+                        
+                                # Define and compile model first
+                        model_encoder = Model(encoder_inputs, output_trial) 
+                        opt = Adam(learning_rate=0.005)
+                        model_encoder.compile(loss='mse', optimizer=opt)
+                        history=model_encoder.fit(train_input,train_target,epochs=30, batch_size=5, verbose=1,validation_data=(validatation_input, validation_target))
+                        model_encoder.save('Pre_trained_models/model_LSTM_Encoder_only2')
+                        plt.plot(history.history['loss'],c='blue')
+                        plt.plot(history.history['val_loss'],c='red')
+                        plt.show()
+                        plt.show()
+
+                # encoder_outputs, state_h, state_c = encoder_lstm(encoder_inputs)
+               
+                # states = [state_h, state_c]
+        
+
+                prediction_test = model_encoder.predict(test_input)
+                prediction_train=model_encoder.predict(train_input)
 
         # plot graphs --to show together set show_together to true
 
-        num_of_trajectories=6  # how many trajectories will be plotted
+        num_of_trajectories=10  # how many trajectories will be plotted
         show_together= False 
-        plotter_double(test_input,prediction_test,test_target,num_of_trajectories,show_together)
-        #print("Murad:",prediction_test[0])
+
+        ## Plot
+        #plotter_double(test_input,prediction_test,test_target,num_of_trajectories,show_together)
+        ## show error
+        #show_error_double(prediction_train,prediction_test,train_target,test_target)
+        #show_error_single(prediction_train,prediction_test,train_target,test_target)
+
+
 
         
-        # # Show error rate
-        # print("AVERAGE DISTANCE BETWEEN FIRST AND LAST POINT Train: ",prediction_displacement(train_target))
-        # print("AVERAGE DISTANCE BETWEEN FIRST AND LAST POINT Test: ",prediction_displacement(test_target))
-        # print("////////////////////////////////////////////////")
-        # #average_displacement_error
-        # print("ADE ERROR RATE TEST: ", ADE(prediction_test,test_target))
-        # #average_displacement_error
-        # print("ADE ERROR RATE TRAIN: ", ADE(prediction_train,train_target))
-        # print("//////////////////////////////////////////")
-        # #Final_displacement_error
-        # print("FDE ERROR RATE TEST: ", FDE(prediction_test,test_target))
-        # print("FDE ERROR RATE TRAIN: ", FDE(prediction_train,train_target))
 
- 
-
-        #average_displacement_error
-        print("ADE ERROR RATE TEST: ", ADE_double_coordinates(prediction_test,test_target))
-        #average_displacement_error
-        print("ADE ERROR RATE TRAIN: ", ADE_double_coordinates(prediction_train,train_target))
-        print("//////////////////////////////////////////")
-        #Final_displacement_error
-        print("FDE ERROR RATE TEST: ", FDE_double_coordinates(prediction_test,test_target))
-        print("FDE ERROR RATE TRAIN: ", FDE_double_coordinates(prediction_train,train_target))

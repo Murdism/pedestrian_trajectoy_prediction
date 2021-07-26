@@ -19,6 +19,23 @@ def ADE(pred,truth):
             #print("Distance between",a," and ",b," is: ",dist)
 
     return (sum/counter)
+def prediction_displacement_double(pred): 
+          
+        sum=0
+        counter=0        
+        pred=np.array(pred)
+        last_index= (len(pred[0])-1)
+        
+        for i in range(len(pred)):
+                
+                    a = np.array((pred[i][0][0] , pred[i][0][1]))
+                    b = np.array((pred[i][last_index][0] , pred[i][last_index][1]))
+
+                    dist = np.linalg.norm(a-b)
+                    sum+=dist
+                    counter+=1
+        return (sum/counter)
+
 def prediction_displacement(pred): 
     counter=0
     sum=0

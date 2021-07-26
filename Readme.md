@@ -1,4 +1,4 @@
-@Murdizm June-2021
+.@Murdizm June-2021
 
 # To run code go to main :
   1. select the number of input and output sequences for the model 
