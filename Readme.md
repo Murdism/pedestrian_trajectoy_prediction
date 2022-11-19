@@ -25,12 +25,11 @@
 
 
 
-  # ######### NOTE: The results show that linear works better but LSTM can be improved to give better results. ########
-
-  # NOTE: In this experiment the difference in time between two points or positions of a pedesterian is 0.4 secs. Example: If you observe the last 8 positions of a pedestrian’s trajectory and predict the next 12 timesteps,this corresponds to an observation window of 3.2 seconds and a prediction for the next 4.8 seconds.
-  
-  Note: Usually having many history points is not helpful especially for linear model. linar model performs well using 4 history points to predict 4 - 6 points in the future, which means, 1.6 secs of trajectory history to predict 
-  1.6  - 2.4 secs in the future.
+  ### NOTE: 
+   1. The results show that linear works better but LSTM can be improved to give better results. 
+   2. In this experiment the difference in time between two points or positions of a pedesterian is 0.4 secs. Example: If you observe the last 8 positions of a pedestrian’s trajectory and predict the next 12 timesteps,this corresponds to an observation window of 3.2 seconds and a prediction for the next 4.8 seconds.
+  3.  Usually having many history points is not helpful especially for linear model. linar model performs well using 4 history points to predict 4 - 6 points in the future, which means, 1.6 secs of trajectory history to predict 
+  4.6  - 2.4 secs in the future.
 
   # The next step is to use GAN and LSTM encoders to predict 
   1. Multiple trajectories
