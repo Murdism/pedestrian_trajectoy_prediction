@@ -19,9 +19,9 @@
   train_model(train_input,train_target,test_input,test_target,'linear',degree,pre_trained)
 
 
-  # Alot of changes can also be done from model_trainer such as number of trajectories shown in plot (by default 6 trajectories are shown in plot for visualization)--- you can also change the visibilty to show trajectories together or separetly. Moreover prediction and ground_truth values can be printed from here (this code section is commented in model_trainer.py)
+  Alot of changes can also be done from model_trainer such as number of trajectories shown in plot (by default 6 trajectories are shown in plot for visualization)--- you can also change the visibilty to show trajectories together or separetly. Moreover prediction and ground_truth values can be printed from here (this code section is commented in model_trainer.py)
 
-  # Displacement_error holds metrics to assess the prediction of the model: ADE (average displacement error) and FDE (final displacement error) are used. The results are directly printed by model_trainer.py
+  Displacement_error holds metrics to assess the prediction of the model: ADE (average displacement error) and FDE (final displacement error) are used. The results are directly printed by model_trainer.py
 
 
 
